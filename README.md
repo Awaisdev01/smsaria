@@ -49,8 +49,6 @@ smartphone, no app, no data bundle, just 2G signal:
 
 ### USSD — no typing skill needed, no internet at all
 
-![USSD menu walkthrough: dial *123#, pick from a numbered menu, type a question](assets/walkthrough-ussd.png)
-
 Dial `*123#` and get a **numbered menu** — the same interface as checking your
 mobile-money balance, so even first-time phone users already know how it works:
 
@@ -68,11 +66,11 @@ USSD screens and reply instantly. **USSD works on every handset ever made.**
 
 ### Live dashboard
 
-![SMSaria dashboard: sessions, inbound/reply counts, token usage vs daily cap](assets/dashboard.png)
-
-`http://your-host:8080/` shows active sessions, message counts, errors, and
-token usage against your daily cap — so you know exactly what the service
-costs while it runs.
+`http://your-host:8080/` (screenshot in the tour above) shows active
+sessions, inbound/reply counts, **offline cache hits**, provider errors, cap
+denials, the daily token budget bar, the language mix of incoming questions,
+and the last 10 messages with their detected language — so you know exactly
+what the service costs and who it serves while it runs.
 
 ---
 
