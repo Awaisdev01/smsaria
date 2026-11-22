@@ -33,7 +33,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from .adapters.webhooks import ADAPTERS, AfricasTalkingAdapter, RawAdapter
 from .gateway.sessions import SessionStore
 from .gateway.sms import compress, split_sms
-from .providers.openai_compat import Budget, OpenAICompatibleProvider, ProviderError
+from .providers.fallback import AnswerCache
+from .providers.openai_compat import (
+    Budget,
+    BudgetDenied,
+    OpenAICompatibleProvider,
+    ProviderError,
+)
 from .ussd.engine import USSDEngine
 
 DEFAULT_SYSTEM_PROMPT = (
@@ -81,6 +87,7 @@ class Gateway:
             budget=self.budget,
         )
         self.sessions = SessionStore()
+        self.cache = AnswerCache(cfg.get("SMSARIA_CACHE_DB", "smsaria_cache.db"))
         self.adapter_names = [
             a.strip() for a in cfg.get("SMSARIA_ADAPTERS", "raw").split(",") if a.strip()
         ]
@@ -134,17 +141,29 @@ class Gateway:
 
         sess = self.sessions.get(sender) or self.sessions.start(sender)
         hint = detect_language_hint(text)
-        self.provider.system_prompt = self.provider.system_prompt.replace(
+        # Per-message prompt: fill the {language_hint} slot without mutating
+        # the template stored on the provider.
+        prompt_template = self.provider.system_prompt
+        self.provider.system_prompt = prompt_template.replace(
             "{language_hint}", hint
         )
         try:
-            reply, _tokens = self.provider.chat(
+            reply, tokens = self.provider.chat(
                 sender, text, history=sess["history"]
             )
+            # Success: seed the offline fallback cache with this answer.
+            if tokens > 0:
+                self.cache.record(text, reply)
+        except BudgetDenied as e:
+            with self.lock:
+                self.stats["denied"] += 1
+            reply = self._fallback(text) or str(e)
         except ProviderError as e:
             with self.lock:
                 self.stats["errors"] += 1
-            reply = "Service error, please try again shortly."
+            reply = self._fallback(text) or "Service error, please try again shortly."
+        finally:
+            self.provider.system_prompt = prompt_template
 
         self.sessions.append_history(sender, sess, "user", text)
         self.sessions.append_history(sender, sess, "assistant", reply)
@@ -165,6 +184,14 @@ class Gateway:
             except Exception:
                 break
         return response
+
+    # ── Offline fallback ─────────────────────────────────────────────────
+    def _fallback(self, question: str):
+        """Closest cached answer for this question, marked as offline."""
+        cached = self.cache.find(question)
+        if cached is None:
+            return None
+        return "(offline answer) " + cached
 
     # ── USSD pipeline ────────────────────────────────────────────────────
     def handle_ussd(self, adapter_name: str, body: bytes) -> dict:

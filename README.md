@@ -136,6 +136,7 @@ Feature phone ──SMS/USSD──▶ Phone network ──webhook──▶ SMSar
         │  sessions:    per-number history, TTL, language    │
         │  budget:      per-sender + global daily caps       │
         │  provider:    any OpenAI-compatible /chat API      │
+        │  fallback:    cached answers when provider is down │
         │  sms codec:   compress + split at word bounds      │
         └───────────────────────────────────────────────────┘
                                                             │
@@ -215,7 +216,7 @@ Add more languages by extending the hint rules in
 | Farming cooperative | farmers | Crop disease triage, planting calendars, market prices |
 | Secondary school | students | Study help on exam curricula, in their language |
 | Health clinic | patients | Medication schedule guidance (with conservative prompts — **not** a diagnosis tool) |
-| Disaster response | affected communities | Cached info cards served even when the LLM is unreachable |
+| Disaster response | affected communities | Offline cache answers from previous questions even when the LLM is unreachable |
 
 > ⚠️ **Safety**: this gateway is a conduit. For health/legal topics, write a
 > system prompt that says "guidance only, see a professional" — SMSaria's
@@ -224,7 +225,7 @@ Add more languages by extending the hint rules in
 
 ## 🧪 Tested
 
-**19 tests, all passing** — run them yourself:
+**21 tests, all passing** — run them yourself:
 
 ```bash
 python3 -m unittest discover tests   # or any test runner
@@ -232,15 +233,16 @@ python3 -m unittest discover tests   # or any test runner
 
 Coverage includes: GSM-7 vs UCS-2 splitting, word-boundary integrity,
 `n/m` prefixes, session TTL expiry, bounded history, per-sender and global
-budget caps with daily roll, and every USSD flow (menus, ask, cancel,
-invalid option, info cards). End-to-end verified: **webhook → AI → reply**
-and the complete **USSD menu → ask → answer** cycle over live HTTP.
+budget caps with daily roll, every USSD flow (menus, ask, cancel, invalid
+option, info cards), and the **offline fallback lifecycle** — provider works
+→ cached → provider dies → cached answer served → budget exhausted → cached
+answer still served. End-to-end verified over the real pipeline.
 
 ## 🗺️ Roadmap
 
 - [ ] `smsaria-nrelay` — Android app that turns any spare phone into an
       SMS relay node (for areas without gateway accounts)
-- [ ] Offline info cards — pre-cached agriculture/health content served
+- [x] ~~Offline fallback~~ — shipped in 0.1.0: cached answers served
       automatically when the LLM is down or budget is exhausted
 - [ ] SQLite session persistence for multi-process deployments
 - [ ] Prometheus metrics endpoint

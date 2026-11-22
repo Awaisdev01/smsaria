@@ -87,7 +87,7 @@ class OpenAICompatibleProvider:
         """Return (reply_text, tokens_used). Raises ProviderError on failure."""
         ok, deny_message = self.budget.allow(sender)
         if not ok:
-            return deny_message, 0
+            raise BudgetDenied(deny_message)
 
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": self.system_prompt}
@@ -136,4 +136,8 @@ class OpenAICompatibleProvider:
 
 
 class ProviderError(RuntimeError):
+    pass
+
+
+class BudgetDenied(ProviderError):
     pass
