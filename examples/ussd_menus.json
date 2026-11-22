@@ -1,0 +1,11 @@
+{
+  "root": {
+    "title": "AI Help Center",
+    "options": {
+      "1": ("Ask any question", "ask"),
+      "2": ("Farming tips", "info:farming"),
+      "3": ("Health basics", "info:health"),
+      "4": ("Study help", "ask")
+    }
+  }
+}
