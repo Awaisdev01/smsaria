@@ -2,7 +2,21 @@
 
 **AI for any phone — the open-source gateway that turns a phone number into an AI service.**
 
-![How a farmer uses SMSaria: texts a question on a basic phone, AI replies in segments](assets/walkthrough-sms.png)
+![SMSaria: open-source AI over SMS and USSD for basic phones — self-hosted, zero dependencies](assets/hero.png)
+
+<div align="center"><strong>2.6 billion people can't use ChatGPT. The services "solving" this are closed platforms. SMSaria is the open-source alternative — your number, your server, your rules.</strong></div>
+
+---
+
+## 👀 The 30-second tour
+
+**SMS — works on every phone that can text:**
+
+![Farmer texts a question on a keypad phone, AI replies in clean 1/2 2/2 segments, follow-up questions work](assets/walkthrough-sms.png)
+
+**USSD — no internet at all:**
+
+![USSD walkthrough: dial *123#, numbered menu, type a question, AI answer on an END screen](assets/walkthrough-ussd.png)
 
 2.6 billion people still use basic phones with no data plan. Across Africa,
 South Asia, and rural America, SMS works where the internet doesn't — but the
@@ -128,6 +142,11 @@ a community (see guardrails below).
 
 ## 🏗️ How it works
 
+![Architecture: feature phones → carrier → SMSaria (adapter, sessions, budget guardrails, SMS codec, offline cache) → any OpenAI-compatible provider or local llama.cpp](assets/architecture.png)
+
+<details>
+<summary>Same diagram as text</summary>
+
 ```
 Feature phone ──SMS/USSD──▶ Phone network ──webhook──▶ SMSaria (:8080)
                                                             │
@@ -142,6 +161,7 @@ Feature phone ──SMS/USSD──▶ Phone network ──webhook──▶ SMSar
                                                             │
 Reply segments ◀────────phone network◀──────────────────────┘
 ```
+</details>
 
 Every piece is a small, readable module:
 
@@ -197,6 +217,17 @@ API budget. SMSaria enforces limits **before** the AI is called:
 
 Watch it all live at `/` — token usage against the daily cap updates on
 every message.
+
+### 🌑 Offline fallback — never dead air
+
+![Offline fallback: answer cached on a normal day, then served marked (offline answer) when the provider is down or the budget is spent](assets/offline-fallback.png)
+
+When the LLM provider is unreachable or the daily budget is spent, SMSaria
+doesn't send an error — it serves the **closest cached answer** (Jaccard
+token-overlap match ≥ 0.5 against every successful answer it has seen),
+marked `(offline answer)`. Communities keep getting answers during outages
+and after the cap: the disaster-response promise is enforced in code, not
+copy. Configure the cache location with `SMSARIA_CACHE_DB`.
 
 ## 🌍 Language support
 

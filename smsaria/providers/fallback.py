@@ -10,6 +10,7 @@ import json
 import os
 import re
 import sqlite3
+import threading
 import time
 from typing import Optional
 
@@ -31,7 +32,10 @@ class AnswerCache:
             "SMSARIA_CACHE_DB", "smsaria_cache.db"
         )
         self.min_overlap = min_overlap
-        self._conn = sqlite3.connect(self.db_path)
+        # One shared connection guarded by a lock — worker threads in the
+        # HTTP server must all be able to record/find.
+        self._lock = threading.Lock()
+        self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self._conn.execute(
             """CREATE TABLE IF NOT EXISTS answers (
                    id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,36 +52,39 @@ class AnswerCache:
         toks = _tokens(question)
         if not toks or not answer:
             return
-        self._conn.execute(
-            "INSERT INTO answers (question, tokens, answer, created) VALUES (?,?,?,?)",
-            (question[:500], json.dumps(sorted(toks)), answer[:600], int(time.time())),
-        )
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO answers (question, tokens, answer, created) VALUES (?,?,?,?)",
+                (question[:500], json.dumps(sorted(toks)), answer[:600], int(time.time())),
+            )
+            self._conn.commit()
 
-    def find(self, question: str) -> Optional[str]:
+    def find(self, question: str):
         q = _tokens(question)
         if not q:
             return None
-        best, best_score = None, 0.0
-        for tok_json, answer in self._conn.execute(
-            "SELECT tokens, answer FROM answers"
-        ):
-            toks = set(json.loads(tok_json))
-            if not toks:
-                continue
-            score = len(q & toks) / len(q | toks)  # Jaccard
-            if score > best_score:
-                best, best_score = answer, score
-        if best is not None and best_score >= self.min_overlap:
-            self._conn.execute(
-                "UPDATE answers SET hits = hits + 1 WHERE answer = ?", (best,)
-            )
-            self._conn.commit()
-            return best
+        with self._lock:
+            best, best_score = None, 0.0
+            for tok_json, answer in self._conn.execute(
+                "SELECT tokens, answer FROM answers"
+            ):
+                toks = set(json.loads(tok_json))
+                if not toks:
+                    continue
+                score = len(q & toks) / len(q | toks)  # Jaccard
+                if score > best_score:
+                    best, best_score = answer, score
+            if best is not None and best_score >= self.min_overlap:
+                self._conn.execute(
+                    "UPDATE answers SET hits = hits + 1 WHERE answer = ?", (best,)
+                )
+                self._conn.commit()
+                return best
         return None
 
     def size(self) -> int:
-        return self._conn.execute("SELECT COUNT(*) FROM answers").fetchone()[0]
+        with self._lock:
+            return self._conn.execute("SELECT COUNT(*) FROM answers").fetchone()[0]
 
     def close(self) -> None:
         self._conn.close()

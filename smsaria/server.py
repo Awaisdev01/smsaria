@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -102,7 +103,12 @@ class Gateway:
             else:
                 self.adapters[name] = ADAPTERS[name]()
         self.ussd_engine = USSDEngine(self._load_ussd_menus())
-        self.stats = {"inbound": 0, "replies": 0, "errors": 0, "denied": 0}
+        self.stats = {
+            "inbound": 0, "replies": 0, "errors": 0, "denied": 0,
+            "offline": 0,
+        }
+        self.recent = []      # last queries for the dashboard
+        self.languages = {}   # hint -> count
         self.ussd_state: dict[str, dict] = {}
         self.lock = threading.Lock()
 
@@ -136,11 +142,21 @@ class Gateway:
             return {"status": 400, "content_type": "text/plain", "body": "bad request"}
 
         sender, text = inbound["sender"], inbound["text"]
+        hint = detect_language_hint(text)
         with self.lock:
             self.stats["inbound"] += 1
-
+            self.languages[hint] = self.languages.get(hint, 0) + 1
+            self.recent.insert(
+                0,
+                {
+                    "time": time.strftime("%H:%M:%S"),
+                    "sender": sender[:6] + "…" + sender[-4:] if len(sender) > 12 else sender,
+                    "text": text[:60],
+                    "lang": hint,
+                },
+            )
+            del self.recent[10:]
         sess = self.sessions.get(sender) or self.sessions.start(sender)
-        hint = detect_language_hint(text)
         # Per-message prompt: fill the {language_hint} slot without mutating
         # the template stored on the provider.
         prompt_template = self.provider.system_prompt
@@ -157,10 +173,14 @@ class Gateway:
         except BudgetDenied as e:
             with self.lock:
                 self.stats["denied"] += 1
+                if self._fallback(text):
+                    self.stats["offline"] += 1
             reply = self._fallback(text) or str(e)
         except ProviderError as e:
             with self.lock:
                 self.stats["errors"] += 1
+                if self._fallback(text):
+                    self.stats["offline"] += 1
             reply = self._fallback(text) or "Service error, please try again shortly."
         finally:
             self.provider.system_prompt = prompt_template
@@ -234,22 +254,76 @@ class Gateway:
     def dashboard(self) -> str:
         with self.lock:
             s = dict(self.stats)
+            recent = list(self.recent)
+            langs = dict(self.languages)
         active = self.sessions.active_count()
         budget = self.budget
-        return (
-            "<!doctype html><meta charset=utf-8><title>SMSaria</title>"
-            "<style>body{font-family:system-ui;background:#0d1117;color:#e6edf3;"
-            "padding:2rem}h1{color:#58a6ff}.n{color:#3fb950;font-weight:700;"
-            "font-size:2rem}</style>"
-            "<h1> SMSaria</h1><p>AI for any phone, over SMS and USSD.</p>"
-            f"<p>Active sessions: <span class=n>{active}</span></p>"
-            f"<p>Inbound: <span class=n>{s['inbound']}</span> &middot; "
-            f"Replies: <span class=n>{s['replies']}</span> &middot; "
-            f"Errors: <span class=n>{s['errors']}</span> &middot; "
-            f"Denied: <span class=n>{s['denied']}</span></p>"
-            f"<p>Global tokens today: <span class=n>{budget._global}</span> / "
-            f"{budget.global_daily}</p>"
-        )
+        pct = min(100, int(budget._global * 100 / max(1, budget.global_daily)))
+
+        def esc(t: str) -> str:
+            return (t.replace("&", "&amp;").replace("<", "&lt;")
+                     .replace(">", "&gt;").replace('"', "&quot;"))
+
+        rows = "".join(
+            f"<tr><td class=m>{esc(r['time'])}</td><td class=m>{esc(r['sender'])}</td>"
+            f"<td>{esc(r['text'])}</td><td class=m>{esc(r['lang'])}</td></tr>"
+            for r in recent
+        ) or '<tr><td colspan=4 class=m>No messages yet — text your number.</td></tr>'
+        lang_chips = " ".join(
+            f'<span class=chip>{esc(k)}: {v}</span>' for k, v in langs.items()
+        ) or '<span class=chip>muted: none yet</span>'
+
+        return f'''<!doctype html><meta charset=utf-8>
+<title>SMSaria</title>
+<style>
+body{{font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;
+  margin:0;padding:2rem;max-width:860px}}
+h1{{color:#58a6ff;font-size:1.6rem;margin:0 0 .2rem}}
+.sub{{color:#8b949e;margin:0 0 1.5rem;font-size:.95rem}}
+.cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+  gap:.8rem;margin-bottom:1.5rem}}
+.card{{background:#161b22;border:1px solid #30363d;border-radius:10px;
+  padding:.9rem 1rem}}
+.card .n{{color:#3fb950;font-weight:700;font-size:1.9rem}}
+.card .warn .n{{color:#f0883e}}
+.card .err .n{{color:#f85149}}
+.card .lbl{{color:#8b949e;font-size:.8rem;margin-top:.2rem}}
+.bar{{background:#161b22;border:1px solid #30363d;border-radius:10px;
+  padding:1rem;margin-bottom:1.5rem}}
+.track{{background:#21262d;border-radius:6px;height:10px;overflow:hidden;
+  margin-top:.5rem}}
+.fill{{background:linear-gradient(90deg,#2f81f7,#3fb950);height:100%;width:{pct}%}}
+.chips{{margin:0 0 1.5rem}}
+.chip{{display:inline-block;background:#161b22;border:1px solid #30363d;
+  border-radius:99px;padding:.25rem .8rem;font-size:.8rem;margin:0 .4rem .4rem 0;
+  color:#79c0ff}}
+table{{width:100%;border-collapse:collapse;background:#161b22;
+  border:1px solid #30363d;border-radius:10px;overflow:hidden}}
+th{{text-align:left;color:#8b949e;font-size:.75rem;text-transform:uppercase;
+  letter-spacing:.05em;padding:.6rem .9rem;border-bottom:1px solid #30363d}}
+td{{padding:.55rem .9rem;border-bottom:1px solid #21262d;font-size:.85rem}}
+td.m{{color:#8b949e;font-family:ui-monospace,monospace;font-size:.78rem;
+  white-space:nowrap}}
+tr:last-child td{{border-bottom:none}}
+</style>
+<h1>📡 SMSaria</h1>
+<p class=sub>AI for any phone, over SMS and USSD — live usage</p>
+<div class=cards>
+<div class=card><div class=n>{active}</div><div class=lbl>active sessions</div></div>
+<div class=card><div class=n>{s['inbound']}</div><div class=lbl>inbound messages</div></div>
+<div class=card><div class=n>{s['replies']}</div><div class=lbl>reply segments sent</div></div>
+<div class="card warn"><div class=n>{s['offline']}</div><div class=lbl>offline cache hits</div></div>
+<div class="card err"><div class=n>{s['errors']}</div><div class=lbl>provider errors</div></div>
+<div class="card err"><div class=n>{s['denied']}</div><div class=lbl>cap denials</div></div>
+</div>
+<div class=bar><b>Daily token budget</b>
+{budget._global:,} / {budget.global_daily:,} ({pct}%)
+<div class=track><div class=fill></div></div></div>
+<p class=chips><b style="color:#8b949e;font-size:.8rem">LANGUAGES SEEN:</b> {lang_chips}</p>
+<table>
+<tr><th>time</th><th>sender</th><th>question</th><th>language</th></tr>
+{rows}
+</table>'''
 
 
 def make_handler(gateway: Gateway) -> type:
