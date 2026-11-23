@@ -31,7 +31,7 @@ charges per message. I couldn't find a single open-source alternative
 Cost for a pilot: $0 (Groq free tier + GSM modem + a $5 VPS or even a
 Raspberry Pi).
 
-Repo: https://github.com/awaisdev5765/smsaria — README has rendered
+Repo: https://github.com/Awaisdev01/smsaria — README has rendered
 walkthroughs of the farmer flow, USSD menus, and the dashboard. 21 tests
 covering the codec, sessions, guardrails, USSD flows, and the offline
 fallback lifecycle.
@@ -64,7 +64,7 @@ that turns an SMS number into an AI service:
   a fully offline deployment
 
 `python -m smsaria.server` and you're listening on :8080. Repo:
-https://github.com/awaisdev5765/smsaria (MIT, 21 tests, README with
+https://github.com/Awaisdev01/smsaria (MIT, 21 tests, README with
 screenshots).
 
 ## Comment templates for replies

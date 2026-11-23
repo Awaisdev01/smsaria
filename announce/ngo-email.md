@@ -18,7 +18,7 @@ closed: the vendor owns the phone number, every question flows through
 their cloud, and every message is billed through them.
 
 I've open-sourced the alternative: **SMSaria** (MIT license,
-github.com/awaisdev5765/smsaria) — a small Python gateway that any
+github.com/Awaisdev01/smsaria) — a small Python gateway that any
 organization can self-host to give its community AI over SMS and USSD:
 
 - **Works on any phone.** SMS for texting; USSD menus (*123#) for

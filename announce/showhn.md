@@ -53,7 +53,7 @@ Cost math for a pilot: Groq free tier + a $15 USB GSM modem (via
 gammu-smsd) = $0 running cost, just the SIM plan. With Africa's Talking at
 ~$0.01/SMS, a 100-message day is about a dollar.
 
-Repo: https://github.com/awaisdev5765/smsaria (README has screenshots of
+Repo: https://github.com/Awaisdev01/smsaria (README has screenshots of
 the farmer flow, USSD menus, and the dashboard; 21 tests; MIT).
 
 What I'd love feedback on: the adapter interface (are there gateways I

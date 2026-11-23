@@ -16,7 +16,7 @@ AI service.
 
 Zero dependencies. Runs on a $5 VPS or Raspberry Pi. MIT.
 
-github.com/awaisdev5765/smsaria
+github.com/Awaisdev01/smsaria
 
 **Tweet 3 (how it works):**
 A farmer texts "my maize leaves have yellow spots" on a $15 keypad phone.
@@ -49,7 +49,7 @@ already have.
 
 If you work with an NGO, school, or clinic that could use this — the
 README has a 5-minute setup:
-github.com/awaisdev5765/smsaria
+github.com/Awaisdev01/smsaria
 
 ⭐ PRs welcome, especially new gateway adapters.
 
@@ -89,6 +89,6 @@ and full docs in the comments.
 ## Short-form (comment replies / groups)
 
 - "Built an open-source alternative to the closed AI-over-SMS services:
-  self-hosted, zero deps, works on any phone. MIT. github.com/awaisdev5765/smsaria"
+  self-hosted, zero deps, works on any phone. MIT. github.com/Awaisdev01/smsaria"
 - "The GSM-7/UCS-2 segment math in non-Latin scripts is the part everyone
   gets wrong — I wrote the codec so NGOs don't have to."

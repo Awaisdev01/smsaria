@@ -3,7 +3,7 @@
 ## The product
 - Open-source SMS/USSD gateway that turns a phone number into an AI service
 - Zero third-party dependencies — Python 3.9+ stdlib only (http.server, sqlite3, urllib)
-- MIT license, repo: https://github.com/awaisdev5765/smsaria
+- MIT license, repo: https://github.com/Awaisdev01/smsaria
 - 21/21 tests; end-to-end verified over live HTTP (SMS webhook→AI→reply, USSD menu→ask→answer)
 
 ## Capabilities

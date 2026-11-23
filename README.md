@@ -79,7 +79,7 @@ what the service costs and who it serves while it runs.
 ### Step 1 — Get the code
 
 ```bash
-git clone https://github.com/awaisdev5765/smsaria.git
+git clone https://github.com/Awaisdev01/smsaria.git
 cd smsaria
 ```
 
